@@ -1,0 +1,71 @@
+@startuml
+!define RECTANGLE class
+
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+skinparam component {
+  BackgroundColor #E1F5FE
+  BorderColor #0288D1
+  FontColor #01579B
+}
+skinparam node {
+  BackgroundColor #FFF3E0
+  BorderColor #F57C00
+  FontColor #E65100
+}
+
+node "Облачная платформа (Yandex Cloud)" {
+  
+  node "Управляется Terraform (IaaS)" {
+    
+    rectangle "VPC Network\n10.0.0.0/16" as vpc
+    
+    rectangle "Subnet A\n10.0.1.0/24" as subnet_a
+    rectangle "Subnet B\n10.0.2.0/24" as subnet_b
+    
+    rectangle "NAT Gateway\n+ Egress" as nat
+    
+    rectangle "Security Group\nKafka (9092,9093)" as sg_kafka
+    rectangle "Security Group\nClickHouse (8123,9000)" as sg_ch
+    
+    rectangle "VM Kafka-1\n4vCPU/8GB/100GB SSD" as kafka1
+    rectangle "VM Kafka-2\n4vCPU/8GB/100GB SSD" as kafka2
+    rectangle "VM Kafka-3\n4vCPU/8GB/100GB SSD" as kafka3
+    
+    rectangle "VM ClickHouse-1\n8vCPU/32GB/100GB SSD" as ch1
+    rectangle "VM ClickHouse-2\n8vCPU/32GB/100GB SSD" as ch2
+    
+    rectangle "VM Data Portal\n2vCPU/4GB/50GB SSD" as portal_vm
+    
+    rectangle "Data Disk CH-1\n1TB HDD" as disk1
+    rectangle "Data Disk CH-2\n1TB HDD" as disk2
+  }
+  
+  node "Настраивается вручную (Ansible)" {
+    rectangle "Kafka Cluster\n+ Zookeeper" as kafka_cluster
+    rectangle "ClickHouse Cluster\n(репликация)" as ch_cluster
+    rectangle "Data Portal App\n(Go + systemd + nginx)" as portal_app
+  }
+}
+
+' Connections
+vpc --> subnet_a
+vpc --> subnet_b
+subnet_a --> nat
+subnet_a --> sg_kafka
+subnet_a --> sg_ch
+
+kafka1 --> kafka_cluster
+kafka2 --> kafka_cluster
+kafka3 --> kafka_cluster
+
+ch1 --> ch_cluster
+ch2 --> ch_cluster
+ch1 --> disk1
+ch2 --> disk2
+
+portal_vm --> portal_app
+portal_app --> ch_cluster : SQL (8123)
+portal_app --> kafka_cluster : consume (9092)
+
+@enduml

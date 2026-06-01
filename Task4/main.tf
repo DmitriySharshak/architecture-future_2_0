@@ -34,7 +34,7 @@ resource "yandex_vpc_network" "future_net" {
 # Подсети
 resource "yandex_vpc_subnet" "subnet_a" {
   name           = "ru-central1-a-subnet"
-  zone           = "ru-central1-a"
+  zone           = var.default_zone
   network_id     = yandex_vpc_network.future_net.id
   v4_cidr_blocks = ["10.0.1.0/24"]
 }
@@ -48,21 +48,21 @@ resource "yandex_vpc_subnet" "subnet_b" {
 
 # VM для Kafka (1 шт для теста, без security groups)
 resource "yandex_compute_instance" "kafka" {
-  count       = 1
+  count       = var.kafka_instance_count
   name        = "kafka-${count.index + 1}"
   platform_id = "standard-v3"
-  zone        = "ru-central1-a"
+  zone        = var.default_zone
 
   resources {
-    cores  = 2
-    memory = 4
+    cores  = var.kafka_resources.cores
+    memory = var.kafka_resources.memory
   }
 
   boot_disk {
     initialize_params {
       image_id = var.ubuntu_image_id
-      size     = 50
-      type     = "network-ssd"
+      size     = var.kafka_boot_disk.size
+      type     = var.kafka_boot_disk.type
     }
   }
 
@@ -78,21 +78,28 @@ resource "yandex_compute_instance" "kafka" {
 
 # VM для ClickHouse (1 шт для теста)
 resource "yandex_compute_instance" "clickhouse" {
-  count       = 1
+  count       = var.clickhouse_instance_count
   name        = "clickhouse-${count.index + 1}"
   platform_id = "standard-v3"
-  zone        = "ru-central1-a"
+  zone        = var.default_zone
 
   resources {
-    cores  = 4
-    memory = 16
+    cores  = var.clickhouse_resources.cores
+    memory = var.clickhouse_resources.memory
   }
 
   boot_disk {
     initialize_params {
       image_id = var.ubuntu_image_id
-      size     = 50
-      type     = "network-ssd"
+      size     = var.clickhouse_boot_disk.size
+      type     = var.clickhouse_boot_disk.type
+    }
+  }
+
+  dynamic "secondary_disk" {
+    for_each = range(var.clickhouse_data_disks.count)
+    content {
+      disk_id = yandex_compute_disk.clickhouse_data[count.index][secondary_disk.value].id
     }
   }
 
@@ -110,18 +117,18 @@ resource "yandex_compute_instance" "clickhouse" {
 resource "yandex_compute_instance" "data_portal" {
   name        = "data-portal"
   platform_id = "standard-v3"
-  zone        = "ru-central1-a"
+  zone        = var.default_zone
 
   resources {
-    cores  = 2
-    memory = 4
+    cores  = var.portal_resources.cores
+    memory = var.portal_resources.memory
   }
 
   boot_disk {
     initialize_params {
       image_id = var.ubuntu_image_id
-      size     = 30
-      type     = "network-ssd"
+      size     = var.portal_boot_disk.size
+      type     = var.portal_boot_disk.type
     }
   }
 

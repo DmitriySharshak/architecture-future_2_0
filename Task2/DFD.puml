@@ -1,0 +1,36 @@
+@startuml
+!include <C4/C4_Context.puml>
+
+System_Boundary(dfd, "Потоки данных между доменами") {
+
+    System(clinical, "Домен «Клиники»")
+    System(fintech, "Домен «Финтех»")
+    System(ai, "Домен «ИИ-сервисы»")
+    System(analytics, "Домен «Аналитика & Data Portal»")
+    System(kafka, "Kafka (событийная шина)")
+
+    System_Ext(pharma, "Фармацевтические партнёры")
+    System_Ext(electronics, "Производитель электроники")
+    System_Ext(regulator, "Регуляторы (ЦБ, Росздравнадзор)")
+    System_Ext(legacy_dwh, "SQL Server 2008 (архив)")
+}
+
+Rel(clinical, kafka, "События: запись, отмена, инвентаризация", "CDC/Debezium")
+Rel(fintech, kafka, "События: платёж, кредит, просрочка", "API")
+Rel(ai, kafka, "Метаданные моделей, загрузка", "API")
+
+Rel(kafka, fintech, "Подписка: платежеспособность (anon)", "Stream")
+Rel(kafka, analytics, "Все разрешённые события", "Stream")
+
+Rel(clinical, analytics, "Агрегаты по SLA (витрина клиник)", "gRPC / Batch")
+Rel(fintech, analytics, "Агрегаты по SLA (витрина финтеха)", "gRPC / Batch")
+Rel(ai, analytics, "Метрики качества моделей (без диагнозов)", "gRPC / Batch")
+
+Rel(analytics, regulator, "Отчётность (фин. + операционная)", "API / SFTP")
+Rel(analytics, pharma, "Обезличенные метаданные об эффективности", "Data Marketplace")
+Rel(electronics, ai, "Поток данных с устройств (ЭКГ, тонометры)", "MQTT / Kafka")
+
+Rel(legacy_dwh, clinical, "Историческая выгрузка (однократная)", "ETL")
+Rel(legacy_dwh, fintech, "Исторические транзакции", "ETL")
+
+@enduml

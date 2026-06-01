@@ -1,0 +1,46 @@
+@startuml
+!include <C4/C4_Container.puml>
+
+Person(business_user, "Бизнес-пользователь", "Менеджер, аналитик, врач (ограниченно)")
+Person(admin, "Администратор данных", "Управляет доступом и витринами")
+
+System_Boundary(cloud, "Облачная платформа Yandex Cloud") {
+
+    Container(portal, "Data Portal", "React + Go", "Портал самообслуживания: каталог витрин, конструктор отчётов, RBAC")
+
+    Container_Boundary(domains, "Домены данных (Data Mesh)") {
+
+        Container(clinic_domain, "Домен «Клиники»", "ClickHouse + Java", "Записи, слоты, персонал, инвентаризация (без медкарт)")
+        Container(fintech_domain, "Домен «Финтех»", "ClickHouse + Java", "Счета, кредиты, транзакции, фин. отчётность")
+        Container(ai_domain, "Домен «ИИ-сервисы»", "ClickHouse + Python", "Метрики моделей, загрузка (медданные не хранятся для аналитики)")
+    }
+
+    Container(event_bus, "Событийная шина", "Kafka + Debezium CDC", "Потоки событий между доменами")
+    Container(bi_tool, "BI-слой", "Apache Superset / Power BI", "Только поверх витрин Data Portal")
+}
+
+System_Ext(legacy_sql, "SQL Server 2008 (архив)", "Исторические данные, выводятся")
+System_Ext(legacy_pb, "PowerBuilder (выводится)", "Интерфейс операторов, замещается веб-порталом")
+System_Ext(fintech_apps, "Финтех-сервисы", "Golang / Java")
+System_Ext(ai_services, "ИИ-сервисы (внутренние)", "Python, работа с сырыми медданными")
+
+Rel(business_user, portal, "Использует", "HTTPS / Отчёты")
+Rel(admin, portal, "Настраивает витрины и доступ", "HTTPS")
+
+Rel(portal, clinic_domain, "Запрашивает агрегаты", "SQL / gRPC")
+Rel(portal, fintech_domain, "Запрашивает витрины", "SQL / gRPC")
+Rel(portal, ai_domain, "Запрашивает метаданные ИИ", "SQL / gRPC")
+
+Rel(clinic_domain, event_bus, "Публикует события", "Kafka")
+Rel(fintech_domain, event_bus, "Публикует события", "Kafka")
+
+Rel(event_bus, fintech_domain, "Подписка", "Kafka")
+Rel(event_bus, ai_domain, "Подписка (обезличенные метаданные)", "Kafka")
+
+Rel(legacy_sql, clinic_domain, "Историческая выгрузка (однократно)", "ETL")
+Rel(fintech_apps, fintech_domain, "Прямая запись", "gRPC / Kafka")
+Rel(ai_services, ai_domain, "Пишут метрики моделей", "API")
+
+Rel_Back(ai_domain, clinic_domain, "Запросы на загрузку врачей", "Kafka (команды)")
+
+@enduml
